@@ -13,6 +13,7 @@ from pathlib import Path
 
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
+from app.core.config import settings
 
 router = APIRouter(prefix="/media", tags=["Media"])
 
@@ -112,7 +113,7 @@ async def upload_image(
     
     # Return URL
     return {
-        "url": f"/uploads/images/{unique_filename}",
+        "url": f"{settings.BASE_URL}/uploads/images/{unique_filename}",
         "filename": unique_filename,
         "media_type": "image"
     }
@@ -170,7 +171,7 @@ async def upload_video(
     
     # Return URL
     return {
-        "url": f"/uploads/videos/{unique_filename}",
+        "url": f"{settings.BASE_URL}/uploads/videos/{unique_filename}",
         "filename": unique_filename,
         "media_type": "video"
     }
