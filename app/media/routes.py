@@ -1,7 +1,8 @@
 """
 Routes for media file uploads (images and videos).
 
-Handles direct file uploads to backend server and serves them as static files.
+Handles file uploads to Cloudinary cloud storage for production,
+with fallback to local storage for development.
 """
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, status, Depends
@@ -10,10 +11,25 @@ import os
 import uuid
 import shutil
 from pathlib import Path
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.core.config import settings
+
+# Configure Cloudinary
+if settings.CLOUDINARY_CLOUD_NAME:
+    cloudinary.config(
+        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+        api_key=settings.CLOUDINARY_API_KEY,
+        api_secret=settings.CLOUDINARY_API_SECRET,
+        secure=True
+    )
+    USE_CLOUDINARY = True
+else:
+    USE_CLOUDINARY = False
 
 router = APIRouter(prefix="/media", tags=["Media"])
 
@@ -96,27 +112,50 @@ async def upload_image(
             detail=f"Image too large. Maximum size: {MAX_IMAGE_SIZE / (1024*1024):.0f} MB"
         )
     
-    # Generate unique filename
-    ext = get_file_extension(file.filename or "")
-    unique_filename = f"{uuid.uuid4()}{ext}"
-    file_path = IMAGES_DIR / unique_filename
-    
-    # Save file
-    try:
-        with open(file_path, "wb") as f:
-            f.write(content)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save file: {str(e)}"
-        )
-    
-    # Return URL
-    return {
-        "url": f"{settings.BASE_URL}/uploads/images/{unique_filename}",
-        "filename": unique_filename,
-        "media_type": "image"
-    }
+    # Upload to Cloudinary if configured, otherwise use local storage
+    if USE_CLOUDINARY:
+        try:
+            # Generate unique public_id
+            unique_id = str(uuid.uuid4())
+            
+            # Upload to Cloudinary
+            result = cloudinary.uploader.upload(
+                content,
+                public_id=unique_id,
+                folder="faithconnect/images",
+                resource_type="image"
+            )
+            
+            return {
+                "url": result['secure_url'],
+                "filename": unique_id,
+                "media_type": "image"
+            }
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload to Cloudinary: {str(e)}"
+            )
+    else:
+        # Local storage fallback (development)
+        ext = get_file_extension(file.filename or "")
+        unique_filename = f"{uuid.uuid4()}{ext}"
+        file_path = IMAGES_DIR / unique_filename
+        
+        try:
+            with open(file_path, "wb") as f:
+                f.write(content)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to save file: {str(e)}"
+            )
+        
+        return {
+            "url": f"{settings.BASE_URL}/uploads/images/{unique_filename}",
+            "filename": unique_filename,
+            "media_type": "image"
+        }
 
 
 @router.post("/upload/video")
@@ -154,24 +193,47 @@ async def upload_video(
             detail=f"Video too large. Maximum size: {MAX_VIDEO_SIZE / (1024*1024):.0f} MB"
         )
     
-    # Generate unique filename
-    ext = get_file_extension(file.filename or "")
-    unique_filename = f"{uuid.uuid4()}{ext}"
-    file_path = VIDEOS_DIR / unique_filename
-    
-    # Save file
-    try:
-        with open(file_path, "wb") as f:
-            f.write(content)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save file: {str(e)}"
-        )
-    
-    # Return URL
-    return {
-        "url": f"{settings.BASE_URL}/uploads/videos/{unique_filename}",
-        "filename": unique_filename,
-        "media_type": "video"
-    }
+    # Upload to Cloudinary if configured, otherwise use local storage
+    if USE_CLOUDINARY:
+        try:
+            # Generate unique public_id
+            unique_id = str(uuid.uuid4())
+            
+            # Upload to Cloudinary
+            result = cloudinary.uploader.upload(
+                content,
+                public_id=unique_id,
+                folder="faithconnect/videos",
+                resource_type="video"
+            )
+            
+            return {
+                "url": result['secure_url'],
+                "filename": unique_id,
+                "media_type": "video"
+            }
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload to Cloudinary: {str(e)}"
+            )
+    else:
+        # Local storage fallback (development)
+        ext = get_file_extension(file.filename or "")
+        unique_filename = f"{uuid.uuid4()}{ext}"
+        file_path = VIDEOS_DIR / unique_filename
+        
+        try:
+            with open(file_path, "wb") as f:
+                f.write(content)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to save file: {str(e)}"
+            )
+        
+        return {
+            "url": f"{settings.BASE_URL}/uploads/videos/{unique_filename}",
+            "filename": unique_filename,
+            "media_type": "video"
+        }

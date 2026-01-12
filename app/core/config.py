@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     # Server URL (auto-detect from environment)
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
     
+    # Cloudinary Settings (for cloud storage)
+    CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+    CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY", "")
+    CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET", "")
+    
     class Config:
         env_file = str(ENV_FILE)
         case_sensitive = True
